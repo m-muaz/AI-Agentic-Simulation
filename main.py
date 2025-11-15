@@ -1,5 +1,5 @@
-from environment import Environment
-from agent import Agent
+from ai_agent_simulation.environment import Environment
+from ai_agent_simulation.agent import Agent
 
 
 def main():
@@ -10,13 +10,13 @@ def main():
     env = Environment()
 
     # Create and add agents to the environment
-    # These represent low-income households with different starting conditions.
-    env.add_agent(Agent(initial_wealth=100.0, initial_health=0.8))
-    env.add_agent(Agent(initial_wealth=50.0, initial_health=0.6))
-    env.add_agent(Agent(initial_wealth=120.0, initial_health=0.9))
+    # Using fixed agent IDs for more predictable history between runs
+    env.add_agent(Agent(initial_wealth=100.0, initial_health=0.8, agent_id="agent_1"))
+    env.add_agent(Agent(initial_wealth=50.0, initial_health=0.6, agent_id="agent_2"))
 
     # Run the simulation for a few steps
-    num_steps = 5
+    # Note: Each step involves an API call for each agent.
+    num_steps = 2
     for i in range(num_steps):
         env.run_step()
 
