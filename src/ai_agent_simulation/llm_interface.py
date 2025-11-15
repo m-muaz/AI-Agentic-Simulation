@@ -31,7 +31,7 @@ def get_llm_response(prompt: str) -> dict:
         client = get_client()
         response = client.chat.completions.create(
             # Note: Change the model name to match what our vLLM server is serving.
-            model="local-model-name",
+            model="Qwen/Qwen3-0.6B",
             messages=[
                 {"role": "system", "content": "You are a component of a simulation. Respond with only JSON."},
                 {"role": "user", "content": prompt}
@@ -42,6 +42,7 @@ def get_llm_response(prompt: str) -> dict:
             temperature=0.7,
         )
         llm_output = response.choices[0].message.content
+        print(llm_output)
         return json.loads(llm_output)
     except Exception as e:
         print(f"An error occurred while contacting the local LLM: {e}")

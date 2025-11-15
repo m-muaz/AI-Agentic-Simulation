@@ -84,7 +84,7 @@ For example: {{"wealth": 105.0, "health": 0.85}}
             # Record new state in history
             self.history.append(self.to_dict())
         else:
-            print(f"Agent {self.agent_id}: Could not update state due to invalid LLM response.")
+            print(f"Agent {self.agent_id}: Could not update state due to invalid LLM response: {llm_response}")
 
 
     def __repr__(self) -> str:
