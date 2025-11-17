@@ -11,30 +11,32 @@ class Agent:
     The agent's behavior and state transitions are determined by an LLM.
     """
 
-    def __init__(self, initial_wealth: float, initial_health: float, agent_id=None):
+    def __init__(self, agent_id: str, initial_wealth: float, initial_health: float,
+                 income: float, loan_access: bool, education: float, consumption_preference: float):
         """
         Initializes an agent with a unique ID and starting attributes.
-
-        Args:
-            initial_wealth: The starting wealth of the agent.
-            initial_health: The starting health of the agent (e.g., on a scale of 0 to 1).
         """
-        self.agent_id = agent_id if agent_id else str(uuid.uuid4())
+        self.agent_id = agent_id
         self.wealth = initial_wealth
         self.health = initial_health
+        self.income = income
+        self.loan_access = loan_access
+        self.education = education
+        self.consumption_preference = consumption_preference
         self.history = [self.to_dict()]
 
     def to_dict(self) -> dict:
         """
         Returns the agent's current state as a dictionary.
-
-        Returns:
-            A dictionary representing the agent's state.
         """
         return {
             "agent_id": self.agent_id,
             "wealth": self.wealth,
             "health": self.health,
+            "income": self.income,
+            "loan_access": self.loan_access,
+            "education": self.education,
+            "consumption_preference": self.consumption_preference,
         }
 
     def to_json(self) -> str:
@@ -52,7 +54,7 @@ class Agent:
         """
         prompt = f"""
 You are an agent in a simulation of a low-income household.
-Your goal is to make decisions that improve your wealth and health.
+Your goal is to make decisions that improve your long-term well-being, primarily your wealth and health.
 
 This is your current state:
 {json.dumps(self.to_dict(), indent=2)}
@@ -60,12 +62,20 @@ This is your current state:
 This is the history of your past states:
 {json.dumps(self.history, indent=2)}
 
+Your 'education' and 'health' affect your productivity and future income.
+'loan_access' determines if you can borrow money.
+'consumption_preference' is the fraction of disposable income you prefer to consume.
+
 Based on your current state and history, decide on your new state for the next time step.
-Your health should be a value between 0.0 and 1.0.
-Your wealth can be any non-negative number.
+Your decisions should reflect a rational attempt to improve your situation.
+For example, you might choose to spend money on something that improves your health or education,
+or you might save money to increase your wealth.
 
 Please respond with a JSON object containing your updated "wealth" and "health".
-For example: {{"wealth": 105.0, "health": 0.85}}
+The change in your wealth should be realistic based on your income and consumption preferences.
+Your health should be a value between 0.0 and 1.0.
+
+Example response: {{"wealth": 1050.0, "health": 0.85}}
 """
         return prompt
 
