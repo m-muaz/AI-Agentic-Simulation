@@ -6,6 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openai",
+    "langchain",
+    "langchain-openai",
+    "pyyaml",
+    "tiktoken",
+    "transformers",
 ]
 
 [tool.setuptools.packages.find]

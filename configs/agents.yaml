@@ -1,0 +1,35 @@
+agents:
+  - id: agent_1
+    name: "Urban Resilience Household"
+    initial_wealth: 100.0
+    initial_health: 0.8
+    household_history: >
+      This household lives in a dense urban neighborhood, juggling gig work and
+      supporting two children. Savings are slim and health fluctuates due to long
+      working hours.
+    starting_parameters:
+      dependents: 2
+      employment_status: gig-worker
+      priorities:
+        - stabilize income
+        - maintain health
+    memory:
+      context_token_limit: 4096
+      summary_trigger_ratio: 0.6
+
+  - id: agent_2
+    name: "Rural Recovery Household"
+    initial_wealth: 50.0
+    initial_health: 0.6
+    household_history: >
+      Rural family recovering from a recent medical expense shock. Access to
+      healthcare is limited but community ties are strong.
+    starting_parameters:
+      dependents: 1
+      employment_status: seasonal-farm
+      priorities:
+        - rebuild savings
+        - monitor health
+    memory:
+      context_token_limit: 4096
+      summary_trigger_ratio: 0.6
