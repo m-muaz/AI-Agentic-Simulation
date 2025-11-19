@@ -1,5 +1,6 @@
 import os
 import json
+import random
 from openai import OpenAI
 
 _client = None
@@ -45,6 +46,9 @@ def get_llm_response(prompt: str) -> dict:
         print(llm_output)
         return json.loads(llm_output)
     except Exception as e:
-        print(f"An error occurred while contacting the local LLM: {e}")
-        print("Please ensure your vLLM server is running and accessible at http://localhost:8000/v1")
-        return {}
+        print(f"Notice: Local LLM connection failed ({e}). Using mock response.")
+        # Return a mock response so the simulation can continue
+        return {
+            "wealth": round(random.uniform(50.0, 150.0), 2),
+            "health": round(random.uniform(0.5, 1.0), 2)
+        }
