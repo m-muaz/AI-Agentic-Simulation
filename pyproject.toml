@@ -6,6 +6,9 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "openai",
+    "python-dotenv",
+    "pandas",
+    "pyreadstat",
 ]
 
 [tool.setuptools.packages.find]
