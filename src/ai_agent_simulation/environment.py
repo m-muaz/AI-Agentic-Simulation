@@ -20,7 +20,8 @@ class Environment:
     """
 
     def __init__(self, wage_rate: float, loan_interest: float, price_level: float,
-                 initial_policy: Policy = Policy.BASELINE):
+                 initial_policy: Policy = Policy.BASELINE, microloan_access_percentage: float = 0.5,
+                 cash_transfer_amount: float = 20.0):
         """
         Initializes the environment with macroeconomic settings.
         """
@@ -30,6 +31,8 @@ class Environment:
         self.loan_interest = loan_interest
         self.price_level = price_level
         self.policy = initial_policy
+        self.microloan_access_percentage = microloan_access_percentage
+        self.cash_transfer_amount = cash_transfer_amount
 
     def add_agent(self, agent: Agent):
         """
@@ -48,21 +51,21 @@ class Environment:
         """
         Applies the current policy to the agents.
         """
+        # Reset loan_access for all agents before applying new policy
+        for agent in self.agents:
+            agent.loan_access = False
+
         if self.policy == Policy.CASH_TRANSFER:
             # All low-income agents receive a fixed wealth amount.
-            # (Here, we apply it to all agents for simplicity)
             for agent in self.agents:
-                agent.wealth += 20
+                agent.wealth += self.cash_transfer_amount
         elif self.policy == Policy.MICROLOAN_ACCESS:
             # A subset of agents get loan access.
-            # (Here, we give it to all agents for simplicity)
-            for agent in self.agents:
+            num_agents_to_grant_access = int(len(self.agents) * self.microloan_access_percentage)
+            agents_to_grant_access = random.sample(self.agents, num_agents_to_grant_access)
+            for agent in agents_to_grant_access:
                 agent.loan_access = True
-        elif self.policy == Policy.BASELINE:
-            # Reset any policy effects if necessary
-            # For now, we'll reset loan_access for demonstration
-            for agent in self.agents:
-                agent.loan_access = False
+        # For BASELINE, loan_access remains False for all agents (due to reset above)
 
 
     def run_step(self):
