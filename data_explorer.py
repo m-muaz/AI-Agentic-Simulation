@@ -3,7 +3,7 @@ import os
 
 def main():
     # Define the path to the .dta file
-    data_file_path = os.path.join(os.getcwd(), "replication files", "Data", "PovertyTraps_replication_data.dta")
+    data_file_path = os.path.join(os.getcwd(), "replication_files", "Data", "PovertyTraps_replication_data.dta")
     output_dir = os.path.join(os.getcwd(), "data", "processed")
     output_file_path = os.path.join(output_dir, "processed_agent_data.csv")
 
