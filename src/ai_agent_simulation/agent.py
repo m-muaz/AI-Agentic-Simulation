@@ -1,12 +1,11 @@
 import json
 import uuid
 from .llm_interface import get_llm_response
-from .economics_model import calculate_poverty_trap_projection 
+from .economics_model import calculate_poverty_trap_projection # NEW IMPORT
 
 class Agent:
     """
     Represents an individual agent in the simulation, driven by an LLM.
-    Each agent has a state consisting of various attributes like wealth and health.
     """
 
     def __init__(self, initial_wealth: float, initial_health: float, agent_id=None):
@@ -27,33 +26,36 @@ class Agent:
 
     def _build_prompt(self) -> str:
         """
-        Builds the prompt for the LLM based on the agent's current state and history.
+        Builds the prompt for the LLM, including the economic projection.
         """
         
-        # Calculate the mathematical reality of the simulation
-        economic_context = calculate_poverty_trap_projection(self.wealth, self.health)
+        # --- NEW LOGIC START ---
+        econ_projection = calculate_poverty_trap_projection(self.wealth, self.health)
+        # --- NEW LOGIC END ---
 
         prompt = f"""
-You are an agent in a simulation of a low-income household based on the Banerjee and Duflo economic model.
-Your goal is to make decisions that improve your wealth and health, trying to break out of the poverty trap.
+You are an agent in a poverty simulation based on the Banerjee & Duflo S-Curve model.
+Your primary goal is to maximize your wealth and health, aiming to break out of the poverty trap (wealth threshold is 80.0).
 
+CURRENT STATE:
+Wealth: {self.wealth:.2f}
+Health: {self.health:.2f}
 
-This is your current state:
-{json.dumps(self.to_dict(), indent=2)}
+--- ECONOMIC REALITY (The laws of the simulation) ---
+{econ_projection['description']}
 
-**Economic Reality:**
-{economic_context['description']}
-(If your wealth is below 80.0, you face diminishing returns. Above 80.0, your capital compounds efficiently.)
+The mathematical model says if you take no action, your wealth will automatically become: {econ_projection['projected_wealth']:.2f}.
+----------------------------------------------
 
-This is the history of your past states:
-{json.dumps(self.history, indent=2)}
+DECISION:
+You can choose to **deviate** from this default outcome by changing your new wealth and health values.
+For instance:
+1.  **Work Harder (Sacrifice Health for Wealth):** Set New Health lower than your current health to generate more income (New Wealth > Projected Wealth).
+2.  **Invest in Health (Sacrifice Wealth for Health):** Set New Health higher than your current health, costing you more wealth (New Wealth < Projected Wealth).
+3.  **Accept Default:** Set new values close to the projected values.
 
-Based on your current state, history, and the Economic Reality provided above, decide on your new state.
-- If you invest in health, your productivity increases, but it costs wealth.
-- If you save wealth, you might cross the threshold, but your health might suffer.
-
-Please respond with a JSON object containing your updated "wealth" and "health".
-For example: {{"wealth": 105.0, "health": 0.85}}
+Respond with a JSON object containing your NEW "wealth" and "health".
+Example: {{"wealth": {econ_projection['projected_wealth']:.2f}, "health": {self.health}}}
 """
         return prompt
 
@@ -62,14 +64,14 @@ For example: {{"wealth": 105.0, "health": 0.85}}
         Defines the agent's behavior for a single time step using an LLM.
         """
         prompt = self._build_prompt()
-        llm_response = get_llm_response(prompt) #
+        llm_response = get_llm_response(prompt)
 
         if llm_response and "wealth" in llm_response and "health" in llm_response:
             self.wealth = float(llm_response["wealth"])
-            self.health = max(0.0, min(1.0, float(llm_response["health"])))
+            self.health = max(0.0, min(1.0, float(llm_response["health"]))) # Clamp health
             self.history.append(self.to_dict())
         else:
-            print(f"Agent {self.agent_id}: Could not update state due to invalid LLM response: {llm_response}")
+            print(f"Agent {self.agent_id}: Could not update state due to invalid LLM response.")
 
     def __repr__(self) -> str:
         return f"Agent(id={self.agent_id}, wealth={self.wealth}, health={self.health})"
