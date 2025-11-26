@@ -75,14 +75,16 @@ For example: {{"wealth": 105.0, "health": 0.85}}
         if llm_response and "wealth" in llm_response and "health" in llm_response:
             
             # Agent decides on the new state (LLM output)
-            llm_decided_wealth = float(llm_response["wealth"])
-            llm_decided_health = float(llm_response["health"])
+            llm_decided_wealth = float(llm_response.get("wealth", self.wealth))
+            llm_decided_health = float(llm_response.get("health", self.health))
             
-            # Update state based on LLM decision (the "action")
+            # 1. Update state based on LLM decision (the "action")
+            # We apply the agent's desired change first.
             self.wealth = max(0.0, llm_decided_wealth)
             self.health = max(0.0, min(1.0, llm_decided_health))
             
-            # Apply the economic change from the S-Curve model
+            # 2. Apply the economic change from the S-Curve model
+            # The environment's physics (dk/dt) apply to the resulting wealth level.
             self.wealth += economic_projection
             
             # Final state must be non-negative

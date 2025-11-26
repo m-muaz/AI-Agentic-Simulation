@@ -1,65 +1,75 @@
+'''
+This module uses common variable name conventions from poverty 
+trap studies: A_w1 for Productive Assets (k) and bmi_w1 for 
+Health (h) (Body Mass Index). It loads the data, cleans it, 
+and samples initial states for the agents.
+'''
+
+
 import pandas as pd
 import numpy as np
-import uuid
-from typing import TYPE_CHECKING
-# Import the Agent class using a relative import
-from .agent import Agent 
+import pyreadstat
+from typing import Tuple, List
 
-# The Environment type hint needs a special import to avoid circular dependency
-if TYPE_CHECKING:
-    from .environment import Environment 
+# Define the data source file and assumed variable names
+DTA_FILE = "PovertyTraps_replication_data.dta"
+# Assumed variables based on common conventions and paper context:
+ASSET_VAR = 'A_w1'      # Productive Assets (k) at Wave 1 (Baseline)
+HEALTH_VAR = 'bmi_w1'   # Health/Human Capital Proxy (h) at Wave 1
 
-# --- CONFIGURATION ---
-DATA_FILE_NAME = "PovertyTraps_replication_data.dta"
-WEALTH_COLUMN = "pce_total" # Using Per Capita Total Consumption Expenditure
-DEFAULT_INITIAL_HEALTH = 0.75 
-MIN_AGENTS = 10  # Number of agents to create from the dataset sample
-MAX_WEALTH_SIM_SCALE = 200.0 # Max simulated wealth for normalization
-
-def load_and_prepare_agents(env: 'Environment'):
+def load_initial_agent_states(n_agents: int) -> List[Tuple[float, float]]:
     """
-    Loads data from the file, normalizes the wealth column, and creates agents 
-    in the provided Environment object.
+    Loads initial wealth (k) and health (h) distributions from the empirical data.
+
+    Args:
+        n_agents: The number of agents to sample for the simulation.
+
+    Returns:
+        A list of tuples [(initial_wealth, initial_health), ...] or fallback states on error.
     """
-    print(f"Loading data from {DATA_FILE_NAME}...")
-    
-    # 1. Load Data
     try:
-        # Load the Stata file. 
-        data = pd.read_stata(DATA_FILE_NAME)
-    except Exception as e:
-        print(f"ERROR: Could not load data file ({DATA_FILE_NAME}).")
-        print("Please ensure the file is in the same directory as main.py and you have 'pandas' and 'pystata' or 'openpyxl' installed.")
-        print(f"Error details: {e}")
-        return
-
-    # 2. Clean and Prepare Data
-    data = data.dropna(subset=[WEALTH_COLUMN])
-    data = data[pd.to_numeric(data[WEALTH_COLUMN], errors='coerce').notnull()]
-    data = data[data[WEALTH_COLUMN] > 0] 
-
-    # 3. Normalize Wealth Data
-    # Normalize the raw wealth data to the simulation scale (0 to MAX_WEALTH_SIM_SCALE)
-    max_raw_wealth = data[WEALTH_COLUMN].max()
-    
-    if max_raw_wealth == 0 or len(data) == 0:
-        print("Error: No valid data found after cleaning. Cannot normalize.")
-        return
-
-    data['sim_wealth'] = (data[WEALTH_COLUMN] / max_raw_wealth) * MAX_WEALTH_SIM_SCALE
-
-    # Use a sample of the data 
-    num_rows = min(len(data), MIN_AGENTS)
-    agent_data = data.head(num_rows) 
-    
-    print(f"Successfully created a sample of {num_rows} agent profiles.")
-
-    # 4. Create Agents
-    for index, row in agent_data.iterrows():
-        initial_wealth = row['sim_wealth']
+        # Requires pyreadstat to be installed
+        df, _ = pyreadstat.read_dta(DTA_FILE)
         
-        env.add_agent(Agent(
-            initial_wealth=initial_wealth,
-            initial_health=DEFAULT_INITIAL_HEALTH,
-            agent_id=f"Agent_{index}" 
+        # 1. Select the assumed columns for wealth and health
+        df = df[[ASSET_VAR, HEALTH_VAR]].copy()
+
+        # 2. Clean and prepare data
+        df.dropna(inplace=True)
+        # Filter out extreme values (e.g., zero or negative assets)
+        df = df[df[ASSET_VAR] > 0] 
+
+        # 3. Normalize Health (BMI) to a 0 to 1 range
+        # Assumed typical BMI range for low-income populations: 15.0 to 35.0
+        min_bmi = 15.0
+        max_bmi = 35.0
+        df['normalized_health'] = np.clip(
+            (df[HEALTH_VAR] - min_bmi) / (max_bmi - min_bmi), 
+            0.05, # Set a small minimum health floor
+            1.0
+        )
+        
+        # Sample the requested number of agents (with replacement if needed)
+        sampled_df = df.sample(n=n_agents, replace=True)
+
+        initial_states = list(zip(
+            sampled_df[ASSET_VAR].values, 
+            sampled_df['normalized_health'].values
         ))
+        
+        print(f"Successfully loaded and sampled {n_agents} initial states from {DTA_FILE}")
+        return initial_states
+
+    except FileNotFoundError:
+        print(f"Error: The data file {DTA_FILE} was not found.")
+    except KeyError:
+        print(f"Error: Could not find one or both columns ('{ASSET_VAR}', '{HEALTH_VAR}') in {DTA_FILE}.")
+        print("Falling back to default fixed initial states.")
+    except Exception as e:
+        print(f"An unexpected error occurred during data loading: {e}")
+        
+    # Fallback to fixed initial states if loading fails
+    return [
+        (100.0, 0.8), (50.0, 0.6), (80.0, 0.7), (120.0, 0.9), (30.0, 0.5), 
+        (75.0, 0.75), (55.0, 0.65), (95.0, 0.85), (25.0, 0.4), (110.0, 0.8)
+    ][:n_agents]
