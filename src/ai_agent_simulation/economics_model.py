@@ -1,58 +1,39 @@
-import math
+import numpy as np
 
-def calculate_poverty_trap_projection(current_wealth: float, current_health: float) -> dict:
+# --- EMPIRICALLY INFORMED S-CURVE PARAMETERS ---
+# Based on the uploaded analysis tables, we set parameters to reflect a clear poverty trap:
+THRESHOLD = 80.0              # The critical wealth level (inflection point, k-hat)
+STEEPNESS = 0.15              # Controls the sharpness of the curve (how fast returns change)
+GROWTH_POTENTIAL = 0.25       # Maximum wealth growth rate (upper asymptote)
+DECLINE_POTENTIAL = -0.05     # Maximum wealth decline rate (lower asymptote)
+
+
+def calculate_poverty_trap_projection(current_wealth: float, current_health: float) -> float:
     """
-    Calculates the 'natural' economic progression based on the Banerjee-Duflo S-curve.
-
-    If the agent is below the threshold, wealth tends to degrade or grow slowly.
-    If the agent is above the threshold, wealth grows exponentially up to a cap.
+    Calculates the change in wealth (dk/dt) based on the Banerjee-Duflo S-curve model.
 
     Args:
-        current_wealth: The agent's current wealth ($W_t$).
-        current_health: The agent's health ($H_t$), acting as a productivity multiplier (0.0 to 1.0).
+        current_wealth: The agent's current wealth (k).
+        current_health: The agent's current health (human capital, h) (0.0 to 1.0).
 
     Returns:
-        A dictionary containing the projected wealth and a narrative description for the LLM.
+        The projected change in wealth for the next step (dk).
     """
-
-    # --- Tunable Model Parameters (Set here after visualization) ---
-    survival_cost = 10.0      # Cost to survive one time step
-    inflection_point = 80.0   # The 'Trap' Threshold (The inflection point of the S-curve)
-    growth_potential = 20.0   # Maximum productivity output per step
-    steepness = 0.2           # How sharp the transition is from low to high returns
-
-    # 1. Calculate Productivity (P) using a Logistic Function (S-Curve)
-    productivity = growth_potential / (1 + math.exp(-steepness * (current_wealth - inflection_point)))
-
-    # 2. Adjust for Health (Productivity is constrained by the agent's capacity/health)
-    effective_income = productivity * current_health
-
-    # 3. Calculate Projected Next Wealth ($W_{t+1}$)
-    projected_wealth = current_wealth + effective_income - survival_cost
-
-    # 4. Generate Narrative for the LLM
-    gap = projected_wealth - current_wealth
     
-    if projected_wealth < current_wealth:
-        status = "CRITICAL: DEGRADING"
-        advice = "Your costs exceed your income. You are in the poverty trap."
-    elif gap < 2.0:
-        status = "STAGNANT"
-        advice = "You are treading water. You need to invest or save strategically."
-    else:
-        status = "GROWING"
-        advice = "You have crossed the threshold. Your capital is working for you."
+    # 1. Calculate the base growth rate from the S-curve
+    growth_rate = DECLINE_POTENTIAL + \
+                  (GROWTH_POTENTIAL - DECLINE_POTENTIAL) / \
+                  (1 + np.exp(-STEEPNESS * (current_wealth - THRESHOLD)))
 
-    description = (
-        f"ECONOMIC FORECAST: {status}. "
-        f"The model predicts your wealth will move to {projected_wealth:.2f} (Change: {gap:+.2f}). "
-        f"Income: {effective_income:.2f} | Survival Cost: {survival_cost:.2f}. "
-        f"Recommendation: {advice}"
-    )
+    # 2. Scale the growth rate by the agent's Health (human capital)
+    # We use a squared health factor to reflect the high dependence of returns on health/capacity.
+    effective_growth = growth_rate * (current_health ** 2)
 
-    return {
-        "projected_wealth": projected_wealth,
-        "income": effective_income,
-        "cost": survival_cost,
-        "description": description
-    }
+    # 3. Project the change in wealth
+    change_in_wealth = current_wealth * effective_growth
+    
+    return change_in_wealth
+
+def get_poverty_trap_threshold() -> float:
+    """Returns the central threshold used in the model for reference."""
+    return THRESHOLD

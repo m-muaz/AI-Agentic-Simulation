@@ -22,4 +22,4 @@ def read_large_stata_file(filename):
         print(chunk.head())
     return df
 
-read_stata_file('path_to_stata_file.dta')
+read_stata_file('data/replication files/Data/PovertyTraps_replication_data.dta')
