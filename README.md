@@ -8,27 +8,25 @@ LLM-driven multi-agent simulation with configurable households, per-agent memory
 - (Optional) GPU with enough VRAM for the chosen model
 
 ## Setup
+Firstly, make sure you have `uv` already installed on your system. If not install it via the following command:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then clone this repository and navigate into it:
 ```bash
 git clone <this-repo>
 cd AI-Agentic-Simulation
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+uv venv --python 3.12
+source .venv/bin/activate && uv pip install -e .
 ```
 
 ## Serve the model with vLLM
-Adjust `--model` to match what you host (defaults in code expect Qwen):
+Adjust `$MODEL_NAME$` to match what you host (defaults in code expect Qwen):
 ```bash
-CUDA_VISIBLE_DEVICES=0 \
-python -m vllm.entrypoints.openai.api_server \
-  --model Qwen/Qwen3-0.6B \
-  --host 0.0.0.0 \
-  --port 8000
+vllm serve $MODEL_NAME --port 8000 --host 0.0.0.0 > vllm.log 2>&1 & # Serve model in the background
+
 ```
-If you use a different model/base URL, set environment variables:
-- `LLM_MODEL` / `LLM_SUMMARY_MODEL` – model ids vLLM serves
-- `LLM_BASE_URL` – OpenAI-compatible endpoint (default `http://localhost:8000/v1`)
-- `LLM_API_KEY` – if your server requires one (default `not-needed`)
 
 ## Configure agents
 Edit `configs/agents.yaml` to define households:
