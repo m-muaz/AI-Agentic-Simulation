@@ -1,10 +1,14 @@
 import json
+import os
 import uuid
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .config import AgentScenario
 from .llm_interface import get_llm_response
 from .memory import AgentMemory, MemoryConfig
+from .tokenization import count_tokens
 
 
 class Agent:
@@ -37,10 +41,15 @@ class Agent:
         self.name = name or self.agent_id
         self.wealth = initial_wealth
         self.health = initial_health
+        self.last_rationale: Optional[str] = None
         self.history = [self.to_dict()]
         self.household_history = (household_history or "").strip()
         self.starting_parameters = starting_parameters or {}
-        memory_cfg = memory_config if isinstance(memory_config, MemoryConfig) else MemoryConfig.from_dict(memory_config)
+        memory_cfg = (
+            memory_config
+            if isinstance(memory_config, MemoryConfig)
+            else MemoryConfig.from_dict(memory_config)
+        )
         self.memory = memory or AgentMemory(agent_id=self.agent_id, config=memory_cfg)
         self.memory.bootstrap(self.household_history)
 
@@ -55,6 +64,7 @@ class Agent:
             "agent_id": self.agent_id,
             "wealth": self.wealth,
             "health": self.health,
+            "rationale": self.last_rationale,
         }
 
     def to_json(self) -> str:
@@ -75,7 +85,11 @@ class Agent:
         """
         memory_context = self.memory.render_context()
         recent_history = json.dumps(self._recent_history(), indent=2)
-        parameters = json.dumps(self.starting_parameters, indent=2) if self.starting_parameters else "None provided."
+        parameters = (
+            json.dumps(self.starting_parameters, indent=2)
+            if self.starting_parameters
+            else "None provided."
+        )
 
         prompt = f"""
 You are an agent in a simulation of a low-income household.
@@ -102,8 +116,8 @@ Based on your current state and history, decide on your new state for the next t
 Your health should be a value between 0.0 and 1.0.
 Your wealth can be any non-negative number.
 
-Please respond with a JSON object containing your updated "wealth" and "health".
-For example: {{"wealth": 105.0, "health": 0.85}}
+Please respond with a JSON object containing your updated "wealth", "health", and a short "rationale" (1-3 sentences).
+For example: {{"wealth": 105.0, "health": 0.85, "rationale": "Picked up extra shifts to grow savings while resting to maintain health."}}
 """
         return prompt
 
@@ -112,6 +126,14 @@ For example: {{"wealth": 105.0, "health": 0.85}}
         Defines the agent's behavior for a single time step using an LLM.
         """
         prompt = self._build_prompt()
+        context_usage = self.memory.context_usage()
+        prompt_tokens = count_tokens(prompt)
+        limit = context_usage["context_token_limit"]
+        context_usage["prompt_tokens"] = prompt_tokens
+        context_usage["prompt_percent_of_limit"] = min(
+            100.0, prompt_tokens / limit * 100.0
+        )
+
         llm_response = get_llm_response(prompt, agent_id=self.agent_id)
         response_payload = llm_response if llm_response else {"error": "empty_response"}
         self.memory.record_interaction(prompt, response_payload)
@@ -119,14 +141,29 @@ For example: {{"wealth": 105.0, "health": 0.85}}
         if llm_response and "wealth" in llm_response and "health" in llm_response:
             # Update state based on LLM response
             self.wealth = float(llm_response["wealth"])
-            self.health = max(0.0, min(1.0, float(llm_response["health"]))) # Clamp health between 0 and 1
+            self.health = max(
+                0.0, min(1.0, float(llm_response["health"]))
+            )  # Clamp health between 0 and 1
+            rationale = llm_response.get("rationale")
+            self.last_rationale = (
+                rationale.strip() if isinstance(rationale, str) else None
+            )
 
             # Record new state in history
             self.history.append(self.to_dict())
         else:
-            print(f"Agent {self.agent_id}: Could not update state due to invalid LLM response: {llm_response}")
+            print(
+                f"Agent {self.agent_id}: Could not update state due to invalid LLM response: {llm_response}"
+            )
             # Summarize and clear the buffer to prevent compounding errors.
             self.memory.force_summarize()
+
+        self._log_step(
+            step_idx=environment.time_step,
+            prompt=prompt,
+            llm_response=llm_response,
+            context_usage=context_usage,
+        )
 
     def __repr__(self) -> str:
         return f"Agent(id={self.agent_id}, wealth={self.wealth}, health={self.health})"
@@ -145,3 +182,30 @@ For example: {{"wealth": 105.0, "health": 0.85}}
             starting_parameters=scenario.starting_parameters,
             memory_config=scenario.memory,
         )
+
+    def _log_step(
+        self,
+        step_idx: int,
+        prompt: str,
+        llm_response: Dict[str, Any],
+        context_usage: Dict[str, float],
+    ):
+        """
+        Persist a JSONL record of each step with rationale, context stats, and memory snapshots.
+        """
+        log_dir = Path("logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "step": step_idx,
+            "agent_id": self.agent_id,
+            "prompt": prompt,
+            "response": llm_response,
+            "rationale": self.last_rationale,
+            "state": self.to_dict(),
+            "context_usage": context_usage,
+            "memory": self.memory.export_state(),
+        }
+        log_path = log_dir / f"agent_{self.agent_id}.jsonl"
+        with log_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(entry) + "\n")

@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-import tiktoken
 from langchain.memory import ConversationBufferMemory, ConversationSummaryMemory
 from langchain.prompts import PromptTemplate
 from langchain.schema import BaseMessage
@@ -66,7 +65,6 @@ class AgentMemory:
             prompt=prompt_template,
         )
         self.summary_text: str = ""
-        # self.encoder = tiktoken.get_encoding("cl100k_base")
 
     def bootstrap(self, initial_summary: Optional[str]):
         """
@@ -130,6 +128,21 @@ class AgentMemory:
         return {
             "summary": ctx["summary"],
             "recent_events": ctx["recent_events"],
+        }
+
+    def context_usage(self) -> Dict[str, float]:
+        """
+        Returns token usage statistics for buffer/summary relative to the configured limit.
+        """
+        buffer_tokens = self._buffer_token_count()
+        summary_tokens = count_tokens(self.summary_text) if self.summary_text else 0
+        limit = max(1, self.config.context_token_limit)
+        percent = min(100.0, (buffer_tokens + summary_tokens) / limit * 100.0)
+        return {
+            "buffer_tokens": buffer_tokens,
+            "summary_tokens": summary_tokens,
+            "context_token_limit": limit,
+            "percent_of_limit": percent,
         }
 
     def force_summarize(self):
