@@ -19,12 +19,22 @@ git clone <this-repo>
 cd AI-Agentic-Simulation
 uv venv --python 3.12
 source .venv/bin/activate && uv pip install -e .
+uv sync --group dev
 ```
 
 ## Serve the model with vLLM
 Adjust `$MODEL_NAME$` to match what you host (defaults in code expect Qwen):
 ```bash
-vllm serve $MODEL_NAME --port 8000 --host 0.0.0.0 > vllm.log 2>&1 & # Serve model in the background
+# If running on a 10GB GPU, e.g., RTX 3080
+ vllm serve ./Qwen3-0.6B \ # path to model
+  --max-model-len 16384 \ # model context length
+  --gpu-memory-utilization 0.9 \ # limits VRAM usage
+  --enforce-eager \ # reduces cudagraph compile overhead
+  --swap-space 4 # enables CPU offloading with 4GB swap
+
+# Other flags to consider:
+# --port 8000 (For custom port)
+# --host <IP_ADDRESS> (For custom host binding)
 
 ```
 

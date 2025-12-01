@@ -10,7 +10,7 @@ _langchain_clients: Dict[str, ChatOpenAI] = {}
 
 BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")
 API_KEY = os.getenv("LLM_API_KEY", "not-needed")
-MODEL_NAME = os.getenv("LLM_MODEL", "Qwen/Qwen3-0.6B")
+MODEL_NAME = os.getenv("LLM_MODEL", "Qwen3-0.6B")
 SUMMARY_MODEL_NAME = os.getenv("LLM_SUMMARY_MODEL", MODEL_NAME)
 
 
