@@ -1,4 +1,4 @@
-from ai_agent_simulation.env.balboni_env import BalboniEnv
+from env.balboni_env import BalboniEnv
 from ai_agent_simulation.economics_model import EconomicParameters
 
 def run_balboni_simulation(household_id=None, steps=15):

@@ -227,3 +227,8 @@ Thumbs.db
 
 # Data files
 data/
+
+# Ignore log files
+logs/
+plots/
+eval/

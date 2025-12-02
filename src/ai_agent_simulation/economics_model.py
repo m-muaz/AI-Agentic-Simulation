@@ -53,23 +53,29 @@ class EconomicModel:
 
         return base_rate * health_factor
 
-    def simulate_next_wealth(self, wealth_t, health_t):
+    def simulate_next_wealth(self, wealth_t, health_t, savings_rate_override=None, shock_scale: float = 1.0):
         """
         Produces next-period wealth using the nonlinear transition law.
 
         k_{t+1} = (1 - delta)*k_t + s * r_t(k_t,h_t) * k_t + shock_t
         """
         p = self.params
+        savings_rate = (
+            min(1.0, max(0.0, float(savings_rate_override)))
+            if savings_rate_override is not None
+            else p.savings_rate
+        )
+        shock_scale = max(0.1, float(shock_scale))
 
         # return rate
         r_t = self.compute_return_rate(wealth_t, health_t)
 
         # deterministic capital evolution
         k_det = (1 - p.depreciation_rate) * wealth_t
-        k_det += p.savings_rate * r_t * wealth_t
+        k_det += savings_rate * r_t * wealth_t
 
         # add stochastic component
-        shock = np.random.normal(0, p.shock_std_dev)
+        shock = np.random.normal(0, p.shock_std_dev * shock_scale)
 
         return max(0.0, k_det + shock)
 

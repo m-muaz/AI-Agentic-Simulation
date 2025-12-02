@@ -8,10 +8,20 @@ dependencies = [
     "langchain",
     "langchain-openai",
     "openai",
+    "pandas>=2.3.3",
     "pyyaml",
     "tiktoken",
     "transformers",
+    "matplotlib",
+    "tqdm",
 ]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[dependency-groups]
+dev = [
+    "langchain==0.2.14",
+    "langchain-openai==0.1.16",
+    "openai==1.59.6",
+]

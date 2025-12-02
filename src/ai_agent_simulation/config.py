@@ -16,6 +16,8 @@ class AgentScenario:
     household_history: str = ""
     starting_parameters: Dict[str, Any] = field(default_factory=dict)
     memory: Dict[str, Any] = field(default_factory=dict)
+    hhid: Optional[int] = None
+    start_wave: int = 1
 
 
 def _coerce_float(value: Any, default: float) -> float:
@@ -49,6 +51,8 @@ def load_agent_configs(path: Optional[str] = None) -> List[AgentScenario]:
                 household_history=entry.get("household_history", ""),
                 starting_parameters=entry.get("starting_parameters", {}),
                 memory=entry.get("memory", {}),
+                hhid=entry.get("hhid"),
+                start_wave=int(entry.get("start_wave", 1)),
             )
         )
     return configs

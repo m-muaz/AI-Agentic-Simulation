@@ -1,3 +1,5 @@
+# Optional: set hhid/start_wave to seed initial wealth/health from Balboni data.
+# If omitted, hhids will be assigned automatically from the dataset.
 agents:
   - id: agent_1
     name: "Urban Resilience Household"

@@ -61,10 +61,13 @@ def get_llm_response(
     """
     try:
         client = get_client()
-        system_content = (
-            "You simulate a single household in isolation. Always produce valid JSON "
-            "and never reference other agents in the simulation."
-        )
+        system_content = """You are a household economic decision agent. 
+                Your goal is to help the household increase its wealth over time,
+                avoid falling into the low-return poverty trap, and manage risk.
+
+                You will receive the household's current state each step.
+                Based on this, you must choose an action that will influence 
+                the household's economic future.Always produce valid JSON"""
         if agent_id:
             system_content += f" You are currently role-playing agent {agent_id}."
 
