@@ -73,3 +73,16 @@ def plot_agent_trajectories(agents: List[Agent]):
     plt.tight_layout()
     plt.show()
     print("--- Visualization Complete (Trajectories) ---")
+
+
+    def plot_wealth_trajectory(states):
+
+        wealth = [s.wealth for s in states]
+
+        plt.figure(figsize=(7,4))
+        plt.plot(wealth, marker='o')
+        plt.xlabel("Time")
+        plt.ylabel("Wealth")
+        plt.title("Wealth trajectory (Historical + Simulated)")
+        plt.show()
+

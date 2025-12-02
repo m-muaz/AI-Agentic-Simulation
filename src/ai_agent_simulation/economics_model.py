@@ -1,44 +1,92 @@
+# src/ai_agent_simulation/economics_model.py
 import numpy as np
 
-# --- EMPIRICALLY INFORMED S-CURVE PARAMETERS ---
-# Based on the uploaded analysis tables, we set parameters to reflect a clear poverty trap:
-# THRESHOLD (k-hat): The unstable equilibrium point where returns accelerate.
-# STEEPNESS: Controls the sharpness of the transition.
-# GROWTH_POTENTIAL/DECLINE_POTENTIAL: Define the upper and lower bounds of growth rate.
-THRESHOLD = 80.0              
-STEEPNESS = 0.15              
-GROWTH_POTENTIAL = 0.25       
-DECLINE_POTENTIAL = -0.05     
-
-
-def calculate_poverty_trap_projection(current_wealth: float, current_health: float) -> float:
+class EconomicParameters:
     """
-    Calculates the change in wealth (dk/dt) based on the Banerjee-Duflo S-curve model.
-
-    The formula is: dk/dt = k * [Decay + (Growth - Decay) / (1 + exp(-Steepness * (k - THRESHOLD)))] * h^2
-
-    Args:
-        current_wealth: The agent's current wealth (k).
-        current_health: The agent's current health (human capital, h) (0.0 to 1.0).
-
-    Returns:
-        The projected change in wealth for the next step (dk).
+    Container for exogenous structural parameters
+    used in the simplified Balboni-style poverty trap model.
     """
-    
-    # 1. Calculate the base growth rate from the S-curve (the non-linear function)
-    growth_rate = DECLINE_POTENTIAL + \
-                  (GROWTH_POTENTIAL - DECLINE_POTENTIAL) / \
-                  (1 + np.exp(-STEEPNESS * (current_wealth - THRESHOLD)))
 
-    # 2. Scale the growth rate by the agent's Health (human capital)
-    # The h^2 term reflects the empirical finding that human capital heavily conditions returns.
-    effective_growth = growth_rate * (current_health ** 2)
+    def __init__(
+        self,
+        asset_threshold=5.0,
+        low_return_rate=0.04,
+        high_return_rate=0.12,
+        depreciation_rate=0.05,
+        savings_rate=0.60,
+        shock_std_dev=0.5,
+        health_productivity_sensitivity=0.10,
+    ):
+        self.asset_threshold = asset_threshold
+        self.low_return_rate = low_return_rate
+        self.high_return_rate = high_return_rate
+        self.depreciation_rate = depreciation_rate
+        self.savings_rate = savings_rate
+        self.shock_std_dev = shock_std_dev
+        self.health_productivity_sensitivity = health_productivity_sensitivity
 
-    # 3. Project the change in wealth (dk = k * growth_rate)
-    change_in_wealth = current_wealth * effective_growth
-    
-    return change_in_wealth
 
-def get_poverty_trap_threshold() -> float:
-    """Returns the central threshold used in the model for reference."""
-    return THRESHOLD
+class EconomicModel:
+    """
+    Simplified economic model of household asset dynamics
+    following a threshold-based nonlinear return function,
+    with health-modulated productivity and shocks.
+    """
+
+    def __init__(self, params: EconomicParameters):
+        self.params = params
+
+    def compute_return_rate(self, wealth, health):
+        """
+        Computes the return rate given the asset level and health.
+        """
+        # threshold logic
+        base_rate = (
+            self.params.high_return_rate
+            if wealth >= self.params.asset_threshold
+            else self.params.low_return_rate
+        )
+
+        # health modification
+        health_factor = 1.0 + self.params.health_productivity_sensitivity * health
+        health_factor = max(0.0, health_factor)
+
+        return base_rate * health_factor
+
+    def simulate_next_wealth(self, wealth_t, health_t):
+        """
+        Produces next-period wealth using the nonlinear transition law.
+
+        k_{t+1} = (1 - delta)*k_t + s * r_t(k_t,h_t) * k_t + shock_t
+        """
+        p = self.params
+
+        # return rate
+        r_t = self.compute_return_rate(wealth_t, health_t)
+
+        # deterministic capital evolution
+        k_det = (1 - p.depreciation_rate) * wealth_t
+        k_det += p.savings_rate * r_t * wealth_t
+
+        # add stochastic component
+        shock = np.random.normal(0, p.shock_std_dev)
+
+        return max(0.0, k_det + shock)
+
+    def simulate_path(self, initial_wealth, health_sequence, T=10):
+        """
+        Simulates a time path of wealth over T steps.
+        health_sequence: list of health_t values of length T.
+        """
+        path = [initial_wealth]
+        current = initial_wealth
+
+        for t in range(T):
+            next_k = self.simulate_next_wealth(
+                wealth_t=current,
+                health_t=health_sequence[t]
+            )
+            path.append(next_k)
+            current = next_k
+
+        return path
