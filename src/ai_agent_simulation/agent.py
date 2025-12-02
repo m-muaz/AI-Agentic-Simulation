@@ -83,39 +83,29 @@ class Agent:
         """
         Builds the prompt for the LLM based on the agent's current state and history.
         """
-        memory_context = self.memory.render_context()
-        recent_history = json.dumps(self._recent_history(), indent=2)
+        household_background = " ".join(self.household_history.split())
+        wealth_change = ", ".join(str(snap["wealth"]) for snap in self.history)
+        health_change = ", ".join(str(snap["health"]) for snap in self.history)
         parameters = (
-            json.dumps(self.starting_parameters, indent=2)
+            "; ".join(f"{k}: {v}" for k, v in self.starting_parameters.items())
             if self.starting_parameters
-            else "None provided."
+            else "None"
         )
 
         prompt = f"""
-You are an agent in a simulation of a low-income household.
-Your goal is to make decisions that improve your wealth and health without referencing other agents.
-You are currently roleplaying: {self.name} ({self.agent_id})
-Household background: {self.household_history or "Not specified."}
-
-Key scenario parameters:
-{parameters}
-
-Recent notable events (keep this concise and base your decision on these only):
-{memory_context['recent_events']}
-
-This is your current state:
-{json.dumps(self.to_dict(), indent=2)}
-
-Recent state snapshots:
-{recent_history}
-
-Based on your current state and history, decide on your new state for the next time step.
-Your health should be a value between 0.0 and 1.0.
-Your wealth can be any non-negative number.
-
-Please respond with a JSON object containing your updated "wealth", "health", and a short "rationale" (1-3 sentences).
-For example: {{"wealth": 105.0, "health": 0.85, "rationale": "Picked up extra shifts to grow savings while resting to maintain health."}}
-"""
+        You are an agent in a simulation of a low-income household.
+        You are currently roleplaying: {self.name} ({self.agent_id})
+        Household background: {household_background or "Not specified."}
+        You care about the following factors when making decisions:
+        {parameters}
+        Wealth trajectory over time: {wealth_change}
+        Health trajectory over time: {health_change}
+        This is your current state:
+        {json.dumps(self.to_dict(), indent=2)}
+        Based on your current state and history, decide on your new state for the next time step. Take the change in wealth and health into careful consideration and think how your current decision will impact your goals in the future.
+        Your health should be a value between 0.0 and 1.0.
+        Your wealth can be any non-negative number.
+        Please respond with a JSON object containing the amount of change for "wealth", "health", and a short "rationale" for each variable's change (1-3 sentences).         """
         return prompt
 
     def step(self, environment):
@@ -207,13 +197,22 @@ For example: {{"wealth": 105.0, "health": 0.85, "rationale": "Picked up extra sh
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
 
-        # Also log notable events separately for quick auditing.
-        events_path = log_dir / f"events_agent_{self.agent_id}.jsonl"
-        events_entry = {
-            "timestamp": entry["timestamp"],
-            "step": step_idx,
-            "agent_id": self.agent_id,
-            "events": self.memory.export_state().get("events", []),
-        }
-        with events_path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(events_entry) + "\n")
+        # Also log state trajectories and rationale to CSV for quick audit.
+        csv_path = log_dir / f"agent_{self.agent_id}.csv"
+        file_exists = csv_path.exists()
+        with csv_path.open("a", encoding="utf-8", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            if not file_exists:
+                writer.writerow(
+                    ["timestamp", "step", "agent_id", "wealth", "health", "rationale"]
+                )
+            writer.writerow(
+                [
+                    entry["timestamp"],
+                    step_idx,
+                    self.agent_id,
+                    self.wealth,
+                    self.health,
+                    self.last_rationale or "",
+                ]
+            )
