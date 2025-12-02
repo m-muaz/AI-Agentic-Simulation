@@ -5,7 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "langchain",
+    "langchain-openai",
     "openai",
+    "pyyaml",
+    "tiktoken",
+    "transformers",
 ]
 
 [tool.setuptools.packages.find]
