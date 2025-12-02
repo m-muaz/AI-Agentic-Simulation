@@ -226,4 +226,4 @@ results/
 Thumbs.db
 
 # Data files
-data/replication_files
+data/replication_files/*
