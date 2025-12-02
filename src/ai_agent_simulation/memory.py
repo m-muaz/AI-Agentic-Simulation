@@ -27,6 +27,12 @@ class MemoryConfig:
         "Summarize the following exchange between the agent and the simulator "
         "highlighting key financial and health decisions."
     )
+    max_recent_events: int = 8
+    event_extraction_preamble: str = (
+        "You will distill a simulation turn into a single concise event."
+        " Focus on what changed (wealth/health/priorities/actions) and why."
+        " Keep it under 250 characters."
+    )
 
     @classmethod
     def from_dict(cls, data: Optional[Dict]) -> "MemoryConfig":
@@ -36,6 +42,8 @@ class MemoryConfig:
             context_token_limit=int(data.get("context_token_limit", cls.context_token_limit)),
             summary_trigger_ratio=float(data.get("summary_trigger_ratio", cls.summary_trigger_ratio)),
             summary_preamble=data.get("summary_preamble", cls.summary_preamble),
+            max_recent_events=int(data.get("max_recent_events", cls.max_recent_events)),
+            event_extraction_preamble=data.get("event_extraction_preamble", cls.event_extraction_preamble),
         )
 
 
@@ -65,6 +73,7 @@ class AgentMemory:
             prompt=prompt_template,
         )
         self.summary_text: str = ""
+        self.events: List[str] = []
 
     def bootstrap(self, initial_summary: Optional[str]):
         """
@@ -74,8 +83,14 @@ class AgentMemory:
             self.summary_text = initial_summary.strip()
 
     def record_interaction(self, prompt: str, response: Dict):
-        self.buffer_memory.chat_memory.add_user_message(prompt)
-        self.buffer_memory.chat_memory.add_ai_message(json.dumps(response))
+        event_text = self._extract_event(prompt, response)
+        if event_text:
+            self.events.append(event_text)
+            # Keep buffer memory aligned with events so summarizer can use it.
+            self.buffer_memory.chat_memory.add_ai_message(event_text)
+        # Clip recent events to avoid unbounded growth between summaries.
+        if len(self.events) > self.config.max_recent_events:
+            self.events = self.events[-self.config.max_recent_events :]
         self._maybe_summarize()
 
     def reset_buffer(self):
@@ -90,11 +105,9 @@ class AgentMemory:
         return "\n".join(rendered).strip()
 
     def _buffer_token_count(self) -> int:
-        messages = self.buffer_memory.chat_memory.messages
-        if not messages:
+        if not self.events:
             return 0
-        segments = [f"{getattr(msg, 'type', 'user')}: {msg.content}" for msg in messages]
-        return count_tokens(segments)
+        return count_tokens(self.events)
         # content = self._messages_to_string(messages)
         # return len(self.encoder.encode(content))
         
@@ -113,7 +126,7 @@ class AgentMemory:
         Returns text snippets for prompt construction.
         """
         buffer_messages = self.buffer_memory.chat_memory.messages
-        buffer_section = self._messages_to_string(buffer_messages) if buffer_messages else "No recent exchanges."
+        buffer_section = "\n".join(self.events) if self.events else "No recent exchanges."
         summary_section = self.summary_text or "No summary yet."
         return {
             "summary": summary_section,
@@ -128,6 +141,7 @@ class AgentMemory:
         return {
             "summary": ctx["summary"],
             "recent_events": ctx["recent_events"],
+            "events": list(self.events),
         }
 
     def context_usage(self) -> Dict[str, float]:
@@ -158,3 +172,27 @@ class AgentMemory:
         new_summary = self.summary_memory.predict_new_summary(messages, self.summary_text or "")
         self.summary_text = new_summary.strip()
         self.reset_buffer()
+        self.events = []
+
+    def _extract_event(self, prompt: str, response: Dict) -> Optional[str]:
+        """
+        Use the LLM to distill the prompt/response into a single important event line.
+        """
+        # If the response contains wealth/health/rationale, prefer those.
+        if response and "wealth" in response and "health" in response:
+            rationale = response.get("rationale", "")
+            return (
+                f"Wealth {response.get('wealth')} Health {response.get('health')} "
+                f"Rationale: {rationale}"
+            ).strip()
+
+        try:
+            extraction_prompt = (
+                f"{self.config.event_extraction_preamble}\n\n"
+                f"Prompt:\n{prompt}\n\n"
+                f"Response:\n{json.dumps(response)}\n\n"
+                "Return a single sentence capturing the most important decision/change."
+            )
+            return self.summary_llm.predict(extraction_prompt).strip()
+        except Exception:
+            return None

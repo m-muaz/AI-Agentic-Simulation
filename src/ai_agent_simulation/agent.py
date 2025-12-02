@@ -100,10 +100,7 @@ Household background: {self.household_history or "Not specified."}
 Key scenario parameters:
 {parameters}
 
-Long-term memory summary:
-{memory_context['summary']}
-
-Recent notable events:
+Recent notable events (keep this concise and base your decision on these only):
 {memory_context['recent_events']}
 
 This is your current state:
@@ -209,3 +206,14 @@ For example: {{"wealth": 105.0, "health": 0.85, "rationale": "Picked up extra sh
         log_path = log_dir / f"agent_{self.agent_id}.jsonl"
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(entry) + "\n")
+
+        # Also log notable events separately for quick auditing.
+        events_path = log_dir / f"events_agent_{self.agent_id}.jsonl"
+        events_entry = {
+            "timestamp": entry["timestamp"],
+            "step": step_idx,
+            "agent_id": self.agent_id,
+            "events": self.memory.export_state().get("events", []),
+        }
+        with events_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(events_entry) + "\n")

@@ -90,3 +90,10 @@
 ### 4.5 Configuration & Monitoring Hooks
 - Add settings to `pyproject`/`config.toml` (or environment variables) for: context-window threshold, summary prompt template, dummy-run lengths.
 - Expose instrumentation counters (e.g., `memory_summaries_total`, `context_resets_total`) so we can verify in logs/metrics that the safeguards fire during long simulations.
+
+## 5. Changes Implemented (current state)
+- Hugging Face tokenizer-based token counting (`tokenization.py`) wired into memory context usage.
+- Prompts trimmed to use only recent notable events (long-term summaries removed from prompts to reduce context size).
+- Importance-first memory: each turn distills a concise event (wealth/health/rationale) instead of logging full prompt/response; summaries roll up these events and clear buffers.
+- Per-step logging with rationale, context usage, and memory snapshots to `logs/agent_<id>.jsonl` plus separate notable-event audits in `logs/events_agent_<id>.jsonl`.
+- YAML agent configs remain the scenario source; environment variables still control LLM endpoint/model; vLLM/OpenAI-compatible client unchanged.
