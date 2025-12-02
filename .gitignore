@@ -140,7 +140,7 @@ celerybeat.pid
 .venv
 # env/
 venv/
-ENV/
+# ENV/
 env.bak/
 venv.bak/
 .uv/
@@ -226,4 +226,4 @@ __marimo__/
 Thumbs.db
 
 # Data files
-data/balboni/replication_files/*
+data/
