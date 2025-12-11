@@ -228,6 +228,145 @@ def health_by_wave(merged: pd.DataFrame) -> pd.DataFrame:
     return grp
 
 
+def plot_sim_only(sim_df: pd.DataFrame, save_dir: Path):
+    """
+    Plot sim-only wealth histogram and mean ± std over steps (wealth and health).
+    """
+    if sim_df.empty:
+        return
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    # Final wealth histogram
+    final_wealth = sim_df.sort_values("step").groupby("agent_id")["wealth"].last()
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.hist(final_wealth.dropna(), bins=20, alpha=0.7)
+    ax.set_title("Final wealth distribution (simulated)")
+    ax.set_xlabel("Wealth")
+    ax.set_ylabel("Agents")
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(save_dir / "eval_sim_final_wealth_hist.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+    # Mean ± std over steps
+    step_stats = sim_df.groupby("step").agg({"wealth": ["mean", "std"], "health": ["mean", "std"]})
+    step_stats.columns = ["wealth_mean", "wealth_std", "health_mean", "health_std"]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4), sharex=True)
+    axes[0].plot(step_stats.index, step_stats["wealth_mean"], label="Mean wealth")
+    axes[0].fill_between(
+        step_stats.index,
+        step_stats["wealth_mean"] - step_stats["wealth_std"],
+        step_stats["wealth_mean"] + step_stats["wealth_std"],
+        alpha=0.2,
+        label="±1 std",
+    )
+    axes[0].set_title("Wealth: mean ± std over steps (sim)")
+    axes[0].set_xlabel("Step")
+    axes[0].set_ylabel("Wealth")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].plot(step_stats.index, step_stats["health_mean"], label="Mean health")
+    axes[1].fill_between(
+        step_stats.index,
+        step_stats["health_mean"] - step_stats["health_std"],
+        step_stats["health_mean"] + step_stats["health_std"],
+        alpha=0.2,
+        label="±1 std",
+    )
+    axes[1].set_title("Health: mean ± std over steps (sim)")
+    axes[1].set_xlabel("Step")
+    axes[1].set_ylabel("Health (0-1)")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    fig.tight_layout()
+    fig.savefig(save_dir / "eval_sim_mean_std_over_steps.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_distribution_overlays(sim_df: pd.DataFrame, panel: Optional[pd.DataFrame], save_dir: Path):
+    """
+    Overlay simulated vs observed (panel) wealth/health distributions (no hhid matching needed).
+    Health is scaled to 0-1 to match simulated health scale.
+    """
+    if sim_df.empty or panel is None:
+        return
+    save_dir.mkdir(parents=True, exist_ok=True)
+    health_min = panel["health_index"].min(skipna=True)
+    health_max = panel["health_index"].max(skipna=True)
+    panel_health = panel["health_index"].dropna()
+    if health_max != health_min:
+        panel_health = ((panel_health - health_min) / (health_max - health_min)).clip(0.0, 1.0)
+    else:
+        panel_health = pd.Series([0.5] * len(panel_health))
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    axes[0].hist(panel["wealth"].dropna(), bins=30, alpha=0.5, label="Observed wealth")
+    axes[0].hist(sim_df["wealth"].dropna(), bins=30, alpha=0.5, label="Sim wealth")
+    axes[0].set_title("Wealth distribution: observed vs simulated")
+    axes[0].set_xlabel("Wealth")
+    axes[0].set_ylabel("Count")
+    axes[0].legend()
+    axes[0].grid(True, alpha=0.3)
+
+    axes[1].hist(panel_health, bins=30, alpha=0.5, label="Observed health (scaled)")
+    axes[1].hist(sim_df["health"].dropna(), bins=30, alpha=0.5, label="Sim health")
+    axes[1].set_title("Health distribution: observed vs simulated")
+    axes[1].set_xlabel("Health (0-1)")
+    axes[1].set_ylabel("Count")
+    axes[1].legend()
+    axes[1].grid(True, alpha=0.3)
+
+    fig.tight_layout()
+    fig.savefig(save_dir / "eval_distribution_overlays.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_unmatched_means(sim_df: pd.DataFrame, panel: Optional[pd.DataFrame], save_dir: Path, start_wave: int):
+    """
+    Plot mean wealth/health over steps (sim) vs mean wealth/health over waves (observed),
+    without requiring per-household matches. Steps are offset by start_wave to align x-axis.
+    """
+    if sim_df.empty or panel is None:
+        return
+    save_dir.mkdir(parents=True, exist_ok=True)
+    health_min = panel["health_index"].min(skipna=True)
+    health_max = panel["health_index"].max(skipna=True)
+    panel_health = panel["health_index"].dropna()
+    if health_max != health_min:
+        panel_health = ((panel_health - health_min) / (health_max - health_min)).clip(0.0, 1.0)
+    else:
+        panel_health = pd.Series([0.5] * len(panel_health))
+
+    obs_wealth_mean = panel.groupby("survey_wave")["wealth"].mean()
+    obs_health_mean = pd.concat([panel["survey_wave"], panel_health], axis=1).groupby("survey_wave")["health_index"].mean()
+
+    sim_stats = sim_df.groupby("step").agg({"wealth": "mean", "health": "mean"})
+    sim_stats["wave"] = sim_stats.index + start_wave
+
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4))
+    axes[0].plot(sim_stats["wave"], sim_stats["wealth"], marker="o", label="Sim wealth mean")
+    axes[0].plot(obs_wealth_mean.index, obs_wealth_mean.values, marker="x", label="Observed wealth mean")
+    axes[0].set_title("Wealth: sim vs observed means (unmatched)")
+    axes[0].set_xlabel("Wave")
+    axes[0].set_ylabel("Wealth")
+    axes[0].grid(True, alpha=0.3)
+    axes[0].legend()
+
+    axes[1].plot(sim_stats["wave"], sim_stats["health"], marker="o", label="Sim health mean")
+    axes[1].plot(obs_health_mean.index, obs_health_mean.values, marker="x", label="Observed health mean (scaled)")
+    axes[1].set_title("Health: sim vs observed means (unmatched)")
+    axes[1].set_xlabel("Wave")
+    axes[1].set_ylabel("Health (0-1)")
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+
+    fig.tight_layout()
+    fig.savefig(save_dir / "eval_unmatched_mean_overlays.png", dpi=150, bbox_inches="tight")
+    plt.close(fig)
+
+
 def plot_vs_observed_means(merged: pd.DataFrame, save_dir: Path):
     """
     Plot mean simulated vs observed wealth/health by wave (matched pairs).
@@ -325,9 +464,12 @@ def main():
     if not health_wave_df.empty:
         health_wave_df.to_csv(args.save_dir / "health_by_wave.csv", index=False)
 
-    # Plots (require matplotlib; will raise if missing)
+    # Plots
+    plot_sim_only(sim_df, args.save_dir)
     plot_vs_observed_means(merged, args.save_dir)
     plot_vs_observed_scatter(merged, args.save_dir)
+    plot_distribution_overlays(sim_df, panel, args.save_dir)
+    plot_unmatched_means(sim_df, panel, args.save_dir, args.start_wave)
 
     print(f"Saved metrics to {args.save_dir}")
     if not mae_df.empty:

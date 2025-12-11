@@ -106,9 +106,27 @@ def plot_household(hhid: int, panel: pd.DataFrame, sim_df: pd.DataFrame, health_
         return
 
     fig, axes = plt.subplots(2, 1, figsize=(8, 8), sharex=False)
-    # Wealth
+    # Wealth (bars + lines)
+    if not obs.empty:
+        axes[0].bar(
+            obs["survey_wave"] - 0.15,
+            obs["wealth"],
+            width=0.18,
+            alpha=0.15,
+            label="Observed wealth (bar)",
+            color="tab:blue",
+            )
     if not obs.empty:
         axes[0].plot(obs["survey_wave"], obs["wealth"], marker="o", label="Observed wealth (Balboni)")
+    if not sim.empty:
+        axes[0].bar(
+            sim["step"] + 0.15,
+            sim["wealth"],
+            width=0.18,
+            alpha=0.15,
+            label="Sim wealth (bar)",
+            color="tab:orange",
+            )
     if not sim.empty:
         axes[0].plot(sim["step"], sim["wealth"], marker="x", label="Simulated wealth")
     axes[0].set_title(f"HHID {hhid} Wealth")
@@ -117,7 +135,16 @@ def plot_household(hhid: int, panel: pd.DataFrame, sim_df: pd.DataFrame, health_
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
-    # Health (scaled observed to 0-1 to match sim)
+    # Health (scaled observed to 0-1 to match sim; bars + lines)
+    if not obs.empty:
+        axes[1].bar(
+            obs["survey_wave"] - 0.15,
+            scale_health(obs["health_index"], health_min, health_max),
+            width=0.18,
+            alpha=0.15,
+            label="Observed health (bar)",
+            color="tab:green",
+            )
     if not obs.empty:
         axes[1].plot(
             obs["survey_wave"],
@@ -125,6 +152,15 @@ def plot_household(hhid: int, panel: pd.DataFrame, sim_df: pd.DataFrame, health_
             marker="o",
             label="Observed health (scaled)",
         )
+    if not sim.empty:
+        axes[1].bar(
+            sim["step"] + 0.15,
+            sim["health"],
+            width=0.18,
+            alpha=0.15,
+            label="Sim health (bar)",
+            color="tab:red",
+            )
     if not sim.empty:
         axes[1].plot(sim["step"], sim["health"], marker="x", label="Simulated health")
     axes[1].set_title(f"HHID {hhid} Health")
@@ -169,17 +205,25 @@ def plot_aggregate(panel: pd.DataFrame, sim_df: pd.DataFrame, health_min: float,
     if sim_df.empty:
         return
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
-    sim_df.groupby("step")["wealth"].mean().plot(ax=axes[0], marker="o", label="Sim mean wealth")
+    wealth_mean = sim_df.groupby("step")["wealth"].mean()
+    health_mean = sim_df.groupby("step")["health"].mean()
+
+    axes[0].bar(wealth_mean.index, wealth_mean.values, width=0.4, alpha=0.15, label="Mean wealth (bar)", color="tab:orange")
+    axes[0].plot(wealth_mean.index, wealth_mean.values, marker="o", label="Mean wealth (line)", color="tab:blue")
     axes[0].set_title("Mean simulated wealth over steps")
     axes[0].grid(True, alpha=0.3)
     axes[0].set_xlabel("Step")
     axes[0].set_ylabel("Wealth")
 
-    sim_df.groupby("step")["health"].mean().plot(ax=axes[1], marker="o", label="Sim mean health")
+    axes[1].bar(health_mean.index, health_mean.values, width=0.4, alpha=0.15, label="Mean health (bar)", color="tab:red")
+    axes[1].plot(health_mean.index, health_mean.values, marker="o", label="Mean health (line)", color="tab:green")
     axes[1].set_title("Mean simulated health over steps")
     axes[1].grid(True, alpha=0.3)
     axes[1].set_xlabel("Step")
     axes[1].set_ylabel("Health (0-1)")
+
+    for ax in axes:
+        ax.legend()
 
     fig.tight_layout()
     save_dir.mkdir(parents=True, exist_ok=True)
