@@ -231,7 +231,7 @@ class Agent:
         """
         Persist a JSONL record of each step with rationale, context stats, and memory snapshots.
         """
-        log_dir = Path("logs")
+        log_dir = Path("logs_run_phase1")
         log_dir.mkdir(parents=True, exist_ok=True)
         entry = {
             "timestamp": datetime.utcnow().isoformat() + "Z",
@@ -255,7 +255,16 @@ class Agent:
             writer = csv.writer(csvfile)
             if not file_exists:
                 writer.writerow(
-                    ["timestamp", "step", "agent_id", "wealth", "health", "rationale"]
+                    [
+                        "timestamp",
+                        "step",
+                        "agent_id",
+                        "wealth",
+                        "health",
+                        "investment",
+                        "total_gain",
+                        "rationale",
+                    ]
                 )
             writer.writerow(
                 [
@@ -264,6 +273,8 @@ class Agent:
                     self.agent_id,
                     self.wealth,
                     self.health,
+                    self.investment,
+                    self.total_gain,
                     self.last_rationale or "",
                 ]
             )
