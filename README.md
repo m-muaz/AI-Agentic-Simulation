@@ -29,6 +29,11 @@ from src.ai_agent_simulation.economic_model import EconomicModel
   - `SIM_STEPS`: number of simulation steps (default 2).
   - `SIM_MODE=mixed`: use the mixed observed + simulated future runner (Balboni panel for an observed window, then LLM predicts future states). Default `SIM_MODE=llm` keeps the LLM-driven agents.
   - `OBS_WINDOW`: how many observed waves to feed to the LLM before it starts predicting (default 2).
+- Experiment phases (toggle the experiment design):
+  - Phase 1 (savings/risk only): `python main.py --experiment-phase 1`
+  - Phase 2 (coping actions + health effort): `python main.py --experiment-phase 2`
+  - Phase 3 (labor/sector income; optional structural data): `python main.py --experiment-phase 3 --structural-data "path/to/PovertyTraps_structural.dta"`
+  - You can also set env vars: `EXPERIMENT_PHASE=1|2|3` and `STRUCTURAL_DATA_PATH=...` (for phase 3).
 
 ## Visualize simulation vs original data
 - Install plotting dependency if needed: `pip install matplotlib` (already listed in `pyproject.toml`).
