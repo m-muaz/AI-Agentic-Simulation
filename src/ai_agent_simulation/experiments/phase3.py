@@ -60,6 +60,7 @@ def build_prompt(agent, environment, data_path: Optional[str] = None) -> str:
       - Returns follow a low/high regime with depreciation and shocks.
     Current simulation step: {step_index}
     Data note: {data_note}
+    Goal: allocate labor/sector and savings so income and wealth grow and stay above the threshold.
     Experiment Phase 3: choose labor allocation and sector; the model computes income flows and savings.
     Your output MUST be valid JSON with:
       - "labor_allocation": an object with shares that sum to 1.0, keys may include "farm", "wage_labor", "self_employment".

@@ -37,6 +37,7 @@ def build_prompt(agent, environment) -> str:
       - Returns: low-regime={low_return} vs high-regime={high_return}; depreciation={depreciation}.
       - Shocks have std dev={shock_std}; higher risk exposure increases variability.
     Current simulation step: {step_index}
+    Goal: choose savings/risk so your wealth grows and stays above the threshold level.
     Experiment Phase 1: you only decide savings and risk. The environment/model applies returns, threshold regime, depreciation, and shocks to update wealth. Investment is tracked as the change in wealth (delta wealth) after the update.
     Your output MUST be valid JSON with the following keys:
       - "savings_rate_t": fraction of income/returns to save (0.0-1.0).

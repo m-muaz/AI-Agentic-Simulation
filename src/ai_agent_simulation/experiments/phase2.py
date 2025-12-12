@@ -34,6 +34,7 @@ def build_prompt(agent, environment) -> str:
       - Threshold regime at asset level: {threshold}.
       - Returns follow a low/high regime with depreciation; shocks are applied each step.
     Current simulation step: {step_index}
+    Goal: choose coping actions so wealth grows and stays above the threshold while managing risk.
     Experiment Phase 2: choose a discrete coping action and optional health effort.
     Your output MUST be valid JSON with:
       - "coping_action": "sell_assets" | "borrow" | "insurance"
