@@ -167,6 +167,10 @@ class Agent:
         context_usage["prompt_percent_of_limit"] = min(
             100.0, prompt_tokens / limit * 100.0
         )
+        # Carry through any experiment-specific paths (e.g., structural data) to downstream helpers.
+        structural_path = getattr(environment, "structural_data_path", None)
+        if structural_path:
+            self.structural_data_path = structural_path
 
         llm_response = get_llm_response(prompt, agent_id=self.agent_id)
         response_payload = llm_response if llm_response else {"error": "empty_response"}

@@ -8,7 +8,12 @@ class Environment:
     Manages the simulation world, its agents, and their interactions.
     """
 
-    def __init__(self, economic_model=None, experiment_phase: int = 1):
+    def __init__(
+        self,
+        economic_model=None,
+        experiment_phase: int = 1,
+        structural_data_path: str | None = None,
+    ):
         """
         Initializes the environment.
         """
@@ -16,6 +21,8 @@ class Environment:
         self.time_step = 0
         self.economic_model = economic_model
         self.experiment_phase = int(experiment_phase or 1)
+        # Optional: path to structural data used by phase 3.
+        self.structural_data_path = structural_data_path
 
     def add_agent(self, agent: Agent):
         """

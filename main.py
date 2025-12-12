@@ -25,6 +25,20 @@ from ai_agent_simulation.economics_model import EconomicModel, EconomicParameter
 
 
 BALBONI_DEFAULT_ZIP = "data/balboni/dataverse_files.zip"
+DEFAULT_STRUCTURAL_PATHS = [
+    # Common location after running process_data.py
+    "data/replication files/Data/PovertyTraps_structural.dta",
+    "data/replication files/Data/PovertyTraps_replication_data.dta",
+    # Simple fallback
+    "data/PovertyTraps_structural.dta",
+]
+
+
+def _first_existing_path(paths: list[str]) -> Optional[str]:
+    for p in paths:
+        if Path(p).exists():
+            return p
+    return None
 
 
 def _maybe_load_balboni_panel(zip_path: Optional[str] = None):
@@ -267,6 +281,15 @@ def _parse_args():
         default=int(os.getenv("EXPERIMENT_PHASE", "1")),
         help="Select experiment phase: 1=savings/risk, 2=coping actions+health effort, 3=labor/sector income.",
     )
+    parser.add_argument(
+        "--structural-data",
+        type=str,
+        default=os.getenv(
+            "STRUCTURAL_DATA_PATH",
+            _first_existing_path(DEFAULT_STRUCTURAL_PATHS) or "data/PovertyTraps_structural.dta",
+        ),
+        help="Path to PovertyTraps structural/replication .dta file for phase 3 income logic.",
+    )
     return parser.parse_args()
 
 
@@ -305,6 +328,7 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
     num_steps = steps or args.sim_steps
     start_wave = args.start_wave
     experiment_phase = args.experiment_phase
+    structural_data_path = args.structural_data
 
     agent_configs = _build_agents_from_data(
         panel,
@@ -320,7 +344,11 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
         if panel is None:
             raise RuntimeError("Balboni data required for mixed mode; panel is empty.")
         obs_window = args.obs_window
-        env = Environment(economic_model=econ_model, experiment_phase=experiment_phase)
+        env = Environment(
+            economic_model=econ_model,
+            experiment_phase=experiment_phase,
+            structural_data_path=structural_data_path,
+        )
         health_min = panel["health_index"].min(skipna=True)
         health_max = panel["health_index"].max(skipna=True)
         for config in agent_configs:
@@ -338,7 +366,11 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
             env.run_step()
         return
 
-    env = Environment(economic_model=econ_model, experiment_phase=experiment_phase)
+    env = Environment(
+        economic_model=econ_model,
+        experiment_phase=experiment_phase,
+        structural_data_path=structural_data_path,
+    )
     for config in agent_configs:
         agent = Agent.from_config(config)
         agent.investment = config.starting_parameters.get("investment")

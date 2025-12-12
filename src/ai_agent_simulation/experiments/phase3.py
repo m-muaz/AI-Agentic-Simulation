@@ -13,7 +13,9 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 
-def _load_structural_data(path: str) -> Optional[pd.DataFrame]:
+def _load_structural_data(path: Optional[str]) -> Optional[pd.DataFrame]:
+    if not path:
+        return None
     data_path = Path(path)
     if data_path.exists():
         try:
@@ -23,10 +25,12 @@ def _load_structural_data(path: str) -> Optional[pd.DataFrame]:
     return None
 
 
-def build_prompt(agent, environment, data_path: str = "data/PovertyTraps_structural.dta") -> str:
+def build_prompt(agent, environment, data_path: Optional[str] = None) -> str:
     """
     Build the phase 3 prompt emphasizing labor allocation and sector choice.
     """
+    # Pick data path: env override > arg > default.
+    data_path = data_path or getattr(environment, "structural_data_path", None) or "data/PovertyTraps_structural.dta"
     household_background = " ".join(agent.household_history.split())
     wealth_change = ", ".join(str(snap["wealth"]) for snap in agent.history)
     health_change = ", ".join(str(snap["health"]) for snap in agent.history)
@@ -88,11 +92,14 @@ def apply_decision(
     agent,
     llm_response: Dict[str, Any],
     econ_model,
-    data_path: str = "data/PovertyTraps_structural.dta",
+    data_path: Optional[str] = None,
 ):
     """
     Apply phase 3 logic: compute income from labor/sector, then feed through economic model.
     """
+    data_path = data_path or getattr(agent, "structural_data_path", None) or getattr(
+        econ_model, "structural_data_path", None
+    ) or "data/PovertyTraps_structural.dta"
     prev_wealth = float(agent.wealth)
     prev_health = float(agent.health)
     allocation = _normalize_allocation(llm_response.get("labor_allocation") or {})
