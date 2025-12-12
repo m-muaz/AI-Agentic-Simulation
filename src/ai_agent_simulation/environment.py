@@ -8,13 +8,14 @@ class Environment:
     Manages the simulation world, its agents, and their interactions.
     """
 
-    def __init__(self, economic_model=None):
+    def __init__(self, economic_model=None, experiment_phase: int = 1):
         """
         Initializes the environment.
         """
         self.agents: List[Agent] = []
         self.time_step = 0
         self.economic_model = economic_model
+        self.experiment_phase = int(experiment_phase or 1)
 
     def add_agent(self, agent: Agent):
         """

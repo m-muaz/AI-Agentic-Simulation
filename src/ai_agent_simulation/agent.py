@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .config import AgentScenario
+from .experiments import phase1, phase2, phase3
 from .llm_interface import get_llm_response
 from .memory import AgentMemory, MemoryConfig
 from .tokenization import count_tokens
@@ -89,9 +90,23 @@ class Agent:
     def _recent_history(self, limit: int = 5) -> List[Dict[str, Any]]:
         return self.history[-limit:]
 
-    def _build_prompt(self, environment=None) -> str:
+    def _build_prompt(self, environment=None, experiment_phase: int = 1) -> str:
         """
         Builds the prompt for the LLM based on the agent's current state and history.
+        Phase toggles allow different experiment designs.
+        """
+        phase = int(experiment_phase or 1)
+        if phase == 1:
+            return phase1.build_prompt(self, environment)
+        if phase == 2:
+            return phase2.build_prompt(self, environment)
+        if phase == 3:
+            return phase3.build_prompt(self, environment)
+        return self._build_default_prompt(environment)
+
+    def _build_default_prompt(self, environment=None) -> str:
+        """
+        Default prompt for richer decision space (savings, health, risk, rationale).
         """
         household_background = " ".join(self.household_history.split())
         wealth_change = ", ".join(str(snap["wealth"]) for snap in self.history)
@@ -102,8 +117,6 @@ class Agent:
             else "None"
         )
         last_state = self.history[-1] if self.history else self.to_dict()
-        prev_wealth = last_state.get("wealth", 0.0)
-        prev_health = last_state.get("health", 0.0)
         step_index = getattr(environment, "time_step", len(self.history) - 1)
         asset_threshold = None
         econ_model = getattr(environment, "economic_model", None) if environment else None
@@ -145,7 +158,8 @@ class Agent:
         If an economic_model is present on the environment, the LLM outputs decisions
         and the model computes the next state.
         """
-        prompt = self._build_prompt(environment)
+        experiment_phase = getattr(environment, "experiment_phase", 1)
+        prompt = self._build_prompt(environment, experiment_phase)
         context_usage = self.memory.context_usage()
         prompt_tokens = count_tokens(prompt)
         limit = context_usage["context_token_limit"]
@@ -161,7 +175,7 @@ class Agent:
         if llm_response:
             econ_model = getattr(environment, "economic_model", None)
             if econ_model is not None:
-                self._apply_decision_with_model(llm_response, econ_model)
+                self._apply_decision_with_model(llm_response, econ_model, experiment_phase)
             elif "wealth" in llm_response and "health" in llm_response:
                 # Fallback to direct-state mode if no economic model is provided.
                 self._apply_direct_state(llm_response)
@@ -177,7 +191,7 @@ class Agent:
             self.memory.force_summarize()
 
         self._log_step(
-            step_idx=environment.time_step,
+            step_idx=getattr(environment, "time_step", len(self.history) - 1),
             prompt=prompt,
             llm_response=llm_response,
             context_usage=context_usage,
@@ -250,9 +264,25 @@ class Agent:
                 ]
             )
 
-    def _apply_decision_with_model(self, llm_response: Dict[str, Any], econ_model):
+    def _apply_decision_with_model(
+        self, llm_response: Dict[str, Any], econ_model, experiment_phase: int = 1
+    ):
         """
         Apply LLM decisions via the economic model to compute next state.
+        """
+        phase = int(experiment_phase or 1)
+        if phase == 1:
+            phase1.apply_decision(self, llm_response, econ_model)
+        elif phase == 2:
+            phase2.apply_decision(self, llm_response, econ_model)
+        elif phase == 3:
+            phase3.apply_decision(self, llm_response, econ_model)
+        else:
+            self._apply_phase2_plus_decision(llm_response, econ_model)
+
+    def _apply_phase2_plus_decision(self, llm_response: Dict[str, Any], econ_model):
+        """
+        Default path (phase 2+): LLM controls savings, health effort, and risk tolerance.
         """
         prev_wealth = float(self.wealth)
         prev_health = float(self.health)

@@ -260,6 +260,13 @@ def _parse_args():
         default=os.getenv("PROGRESS", "1") != "0",
         help="Show tqdm progress bar for simulation steps.",
     )
+    parser.add_argument(
+        "--experiment-phase",
+        type=int,
+        choices=[1, 2, 3],
+        default=int(os.getenv("EXPERIMENT_PHASE", "1")),
+        help="Select experiment phase: 1=savings/risk, 2=coping actions+health effort, 3=labor/sector income.",
+    )
     return parser.parse_args()
 
 
@@ -297,6 +304,7 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
     agent_limit = args.agent_limit if args.agent_limit > 0 else None
     num_steps = steps or args.sim_steps
     start_wave = args.start_wave
+    experiment_phase = args.experiment_phase
 
     agent_configs = _build_agents_from_data(
         panel,
@@ -312,7 +320,7 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
         if panel is None:
             raise RuntimeError("Balboni data required for mixed mode; panel is empty.")
         obs_window = args.obs_window
-        env = Environment(economic_model=econ_model)
+        env = Environment(economic_model=econ_model, experiment_phase=experiment_phase)
         health_min = panel["health_index"].min(skipna=True)
         health_max = panel["health_index"].max(skipna=True)
         for config in agent_configs:
@@ -330,7 +338,7 @@ def main(config_path: Optional[str] = None, steps: Optional[int] = None):
             env.run_step()
         return
 
-    env = Environment(economic_model=econ_model)
+    env = Environment(economic_model=econ_model, experiment_phase=experiment_phase)
     for config in agent_configs:
         agent = Agent.from_config(config)
         agent.investment = config.starting_parameters.get("investment")
