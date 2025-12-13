@@ -1,5 +1,6 @@
 import argparse
 import os
+import random
 import sys
 from pathlib import Path
 from typing import List, Optional
@@ -128,9 +129,9 @@ def _update_from_balboni(agent_configs, panel):
 
 def _select_households(panel, limit: Optional[int] = None) -> list[int]:
     hhids = list(panel["hhid5"].dropna().unique())
-    if limit is not None:
-        hhids = hhids[:limit]
-    return hhids
+    if limit is None or limit >= len(hhids):
+        return hhids
+    return random.sample(hhids, k=limit)
 
 
 def _build_agents_from_data(

@@ -14,6 +14,55 @@ MODEL_NAME = os.getenv("LLM_MODEL", "Qwen3-0.6B")
 SUMMARY_MODEL_NAME = os.getenv("LLM_SUMMARY_MODEL", MODEL_NAME)
 
 
+def _strip_code_fences(text: str) -> str:
+    """
+    Remove common Markdown fences around JSON blobs (```json ... ```).
+    """
+    stripped = text.strip()
+    if not stripped.startswith("```"):
+        return stripped
+
+    lines = stripped.splitlines()
+    # Drop first and last fence lines if present.
+    if lines:
+        if lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip().startswith("```"):
+            lines = lines[:-1]
+    cleaned = "\n".join(lines).strip()
+    if cleaned.lower().startswith("json"):
+        cleaned = cleaned[4:].strip()
+    return cleaned
+
+
+def _parse_llm_json(llm_output: str) -> Optional[dict]:
+    """
+    Try multiple strategies to recover a JSON object from the LLM output.
+    """
+    if not llm_output or not isinstance(llm_output, str):
+        return None
+
+    candidates = []
+    stripped = llm_output.strip()
+    candidates.append(stripped)
+
+    fenced = _strip_code_fences(stripped)
+    if fenced != stripped:
+        candidates.append(fenced)
+
+    brace_start = llm_output.find("{")
+    brace_end = llm_output.rfind("}")
+    if 0 <= brace_start < brace_end:
+        candidates.append(llm_output[brace_start : brace_end + 1].strip())
+
+    for candidate in candidates:
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
 def get_client() -> OpenAI:
     """
     Initializes and returns the OpenAI client, configured for a local vLLM server.
@@ -82,11 +131,20 @@ def get_llm_response(
             model=MODEL_NAME,
             messages=messages,
             response_format={"type": "json_object"},
-            temperature=0.7,
+            temperature=0.85,
         )
-        llm_output = response.choices[0].message.content
-        print(llm_output)
-        return json.loads(llm_output)
+        message = response.choices[0].message
+        # Prefer parsed content if the client provides it (newer OpenAI SDKs).
+        llm_output = getattr(message, "parsed", None) or message.content
+        parsed = _parse_llm_json(llm_output) if isinstance(llm_output, str) else llm_output
+        if parsed is None:
+            raw_text = "" if llm_output is None else str(llm_output)
+            snippet = raw_text[:400] + ("..." if len(raw_text) > 400 else "")
+            print("LLM returned unparsable JSON. Snippet:")
+            print(snippet)
+            return {}
+        print(parsed)
+        return parsed
     except Exception as e:
         print(f"An error occurred while contacting the local LLM: {e}")
         print(f"Please ensure your vLLM server is running and accessible at {BASE_URL}")
