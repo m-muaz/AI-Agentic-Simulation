@@ -14,7 +14,7 @@ from src.ai_agent_simulation.economics_model import EconomicParameters
 ASSET_THRESHOLD = EconomicParameters().asset_threshold
 
 # Update these paths as needed
-SIM_ZIP_PATH = Path("logs_run_phase1.zip")
+SIM_ZIP_PATH = Path("logs_run_phase1_larger.zip")
 
 # Your project originally expects this path; keep it, but allow override
 DEFAULT_BALBONI_PANEL_PATH = Path("data/balboni/processed/balboni_panel.csv")
@@ -46,11 +46,21 @@ def load_sim_logs(zip_path: Path) -> pd.DataFrame:
     dfs = []
     decision_rows = []
 
+    def _read_csv_robust(fileobj) -> pd.DataFrame:
+        """
+        Try UTF-8 first; fall back to latin-1 with replacement on decode errors.
+        """
+        try:
+            return pd.read_csv(fileobj)
+        except UnicodeDecodeError:
+            fileobj.seek(0)
+            return pd.read_csv(fileobj, encoding="latin-1", on_bad_lines="skip")
+
     with zipfile.ZipFile(zip_path) as z:
         for fname in z.namelist():
             if fname.endswith(".csv"):
                 with z.open(fname) as f:
-                    df = pd.read_csv(f)
+                    df = _read_csv_robust(f)
                     df["household_id"] = Path(fname).stem
                     dfs.append(df)
 
