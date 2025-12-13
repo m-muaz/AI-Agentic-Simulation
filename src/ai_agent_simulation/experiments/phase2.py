@@ -35,7 +35,7 @@ def build_prompt(agent, environment) -> str:
       - Returns follow a low/high regime with depreciation; shocks are applied each step.
     Current simulation step: {step_index}
     Goal: choose coping actions so wealth grows and stays above the threshold while managing risk.
-    Experiment Phase 2: choose a discrete coping action and optional health effort.
+    Experiment Phase 2: choose a discrete coping action and health effort.
     Your output MUST be valid JSON with:
       - "coping_action": "sell_assets" | "borrow" | "insurance"
       - "coping_intensity": 0.0-1.0 (fractional intensity of that action)
